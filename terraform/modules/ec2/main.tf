@@ -1,10 +1,17 @@
 locals {
+  ansible_install_script       = file("${path.module}/ansible_install.sh")
+  amazon_linux_script          = file("${path.module}/install_ansible_amazon_linux.sh")
+  maven_kubectl_install_script = file("${path.module}/install-maven-kubectl.sh")
+
   combined_user_data = <<-EOF
     #!/bin/bash
     set -e
-    ${file("${path.module}/ansible_install.sh")}
-    ${file("${path.module}/install_ansiable_amazon_linux.sh")}
-    ${file("${path.module}/install-maven-kubectl.sh")}
+
+    ${local.ansible_install_script}
+
+    ${local.amazon_linux_script}
+
+    ${local.maven_kubectl_install_script}
   EOF
 }
 
@@ -17,6 +24,7 @@ resource "aws_instance" "jenkins" {
   associate_public_ip_address = true
   iam_instance_profile        = var.iam_instance_profile
   user_data                   = local.combined_user_data
+
   tags = {
     Name = var.instance_name
   }
