@@ -1,9 +1,3 @@
-provider "aws" {
-  region = "ap-south-1"  # Change to your desired region
-  profile = "terraform"  # Change to your AWS CLI profile
-  
-}
-
 
 # VPC Module
 module "vpc" {
