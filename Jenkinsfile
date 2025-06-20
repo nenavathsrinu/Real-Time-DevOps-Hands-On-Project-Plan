@@ -1,91 +1,23 @@
-pipeline {
-  agent any
-
-  parameters {
-    choice(name: 'ACTION', choices: ['create', 'destroy'], description: 'Select the Terraform action to perform')
+stage('Deploy Docker App to Remote Host') {
+  when {
+    expression { params.ACTION == 'create' }
   }
+  steps {
+    script {
+      sh """
+        echo "📦 Copying app code to Docker host (${REMOTE_HOST})..."
+        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} 'rm -rf ${REMOTE_DIR}'
+        scp -o StrictHostKeyChecking=no -r app/ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}
 
-  environment {
-    AWS_DEFAULT_REGION = 'ap-south-1'
-    REMOTE_USER = 'ec2-user'
-    REMOTE_HOST = '15.206.28.137'
-    REMOTE_DIR = '/home/ec2-user/nodejs-ip'
-    IMAGE_NAME = 'nodejs-ip-app'
-    CONTAINER_NAME = 'nodejs-ip-container'
-  }
-
-  options {
-    timestamps()
-  }
-
-  stages {
-    stage('Clone GitHub Repo') {
-      steps {
-        git branch: 'main', url: 'https://github.com/nenavathsrinu/Real-Time-DevOps-Hands-On-Project-Plan.git'
-      }
-    }
-
-    stage('Terraform Action') {
-      steps {
-        dir('terraform') {
-          withCredentials([[ 
-            $class: 'AmazonWebServicesCredentialsBinding',
-            credentialsId: 'aws-credentials'
-          ]]) {
-            script {
-              if (params.ACTION == 'create') {
-                sh '''
-                  terraform init
-                  terraform validate
-                  terraform plan -out=tfplan
-                  terraform apply -auto-approve tfplan
-                '''
-              } else if (params.ACTION == 'destroy') {
-                sh '''
-                  terraform init
-                  terraform validate
-                  terraform destroy -auto-approve
-                '''
-              } else {
-                error "Unsupported ACTION value: ${params.ACTION}"
-              }
-            }
-          }
-        }
-      }
-    }
-
-    stage('Deploy Docker App to Remote Host') {
-      when {
-        expression { params.ACTION == 'create' }
-      }
-      steps {
-        script {
-          sh """
-            echo "📦 Copying app code to Docker host (${REMOTE_HOST})..."
-            ssh ${REMOTE_USER}@${REMOTE_HOST} 'rm -rf ${REMOTE_DIR}'
-            scp -r app/ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}
-
-            echo "🐳 Building and running Docker container remotely..."
-            ssh ${REMOTE_USER}@${REMOTE_HOST} <<EOF
-              cd ${REMOTE_DIR}
-              docker stop ${CONTAINER_NAME} || true
-              docker rm ${CONTAINER_NAME} || true
-              docker build -t ${IMAGE_NAME} .
-              docker run -d -p 3000:3000 --name ${CONTAINER_NAME} ${IMAGE_NAME}
-            EOF
-          """
-        }
-      }
-    }
-  }
-
-  post {
-    success {
-      echo "✅ '${params.ACTION}' completed successfully!"
-    }
-    failure {
-      echo "❌ '${params.ACTION}' failed."
+        echo "🐳 Building and running Docker container remotely..."
+        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
+          cd ${REMOTE_DIR}
+          docker stop ${CONTAINER_NAME} || true
+          docker rm ${CONTAINER_NAME} || true
+          docker build -t ${IMAGE_NAME} .
+          docker run -d -p 3000:3000 --name ${CONTAINER_NAME} ${IMAGE_NAME}
+EOF
+      """
     }
   }
 }
