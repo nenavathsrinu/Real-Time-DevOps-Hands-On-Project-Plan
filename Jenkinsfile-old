@@ -7,11 +7,6 @@ pipeline {
 
   environment {
     AWS_DEFAULT_REGION = 'ap-south-1'
-    REMOTE_USER = 'ec2-user'
-    REMOTE_HOST = '15.206.28.137'
-    REMOTE_DIR = '/home/ec2-user/nodejs-ip'
-    IMAGE_NAME = 'nodejs-ip-app'
-    CONTAINER_NAME = 'nodejs-ip-container'
   }
 
   options {
@@ -19,7 +14,7 @@ pipeline {
   }
 
   stages {
-    stage('Clone GitHub Repo') {
+    stage('Checkout Code') {
       steps {
         git branch: 'main', url: 'https://github.com/nenavathsrinu/Real-Time-DevOps-Hands-On-Project-Plan.git'
       }
@@ -28,7 +23,7 @@ pipeline {
     stage('Terraform Action') {
       steps {
         dir('terraform') {
-          withCredentials([[ 
+          withCredentials([[
             $class: 'AmazonWebServicesCredentialsBinding',
             credentialsId: 'aws-credentials'
           ]]) {
@@ -54,38 +49,14 @@ pipeline {
         }
       }
     }
-
-    stage('Deploy Docker App to Remote Host') {
-      when {
-        expression { params.ACTION == 'create' }
-      }
-      steps {
-        script {
-          sh """
-            echo "📦 Copying app code to Docker host (${REMOTE_HOST})..."
-            ssh ${REMOTE_USER}@${REMOTE_HOST} 'rm -rf ${REMOTE_DIR}'
-            scp -r app/ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}
-
-            echo "🐳 Building and running Docker container remotely..."
-            ssh ${REMOTE_USER}@${REMOTE_HOST} <<EOF
-              cd ${REMOTE_DIR}
-              docker stop ${CONTAINER_NAME} || true
-              docker rm ${CONTAINER_NAME} || true
-              docker build -t ${IMAGE_NAME} .
-              docker run -d -p 3000:3000 --name ${CONTAINER_NAME} ${IMAGE_NAME}
-            EOF
-          """
-        }
-      }
-    }
   }
 
   post {
     success {
-      echo "✅ '${params.ACTION}' completed successfully!"
+      echo "✅ Terraform '${params.ACTION}' completed successfully!"
     }
     failure {
-      echo "❌ '${params.ACTION}' failed."
+      echo "❌ Terraform '${params.ACTION}' failed."
     }
   }
 }
