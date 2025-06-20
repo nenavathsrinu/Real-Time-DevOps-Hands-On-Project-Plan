@@ -21,7 +21,7 @@ module "jenkins_ec2" {
   instance_type      = "t2.medium"
   subnet_id          = module.vpc.public_subnet_ids[0]
   key_name           = "linux-test"
-  instance_name      = "jenkins-server"
+  instance_name      = "client-server"
   iam_instance_profile = module.iam.iam_instance_profile_name
   vpc_id = module.vpc.vpc_id
 }
