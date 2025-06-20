@@ -2,55 +2,61 @@ pipeline {
   agent any
 
   parameters {
-    choice(name: 'ACTION', choices: ['create', 'destroy'], description: 'Choose action to perform')
+    choice(name: 'ACTION', choices: ['create', 'destroy'], description: 'Select the Terraform action to perform')
   }
 
   environment {
-    REMOTE_HOST = "15.206.28.137"
-    REMOTE_USER = "ec2-user"
-    APP_DIR = "nodejs-ip"
+    AWS_DEFAULT_REGION = 'ap-south-1'
+  }
+
+  options {
+    timestamps()
   }
 
   stages {
-    stage('Deploy Docker App to Remote Host') {
-      when {
-        expression { params.ACTION == 'create' }
-      }
+    stage('Checkout Code') {
       steps {
-        script {
-          echo "📦 Copying app code to Docker host (${env.REMOTE_HOST})..."
-
-          sh """
-            ssh -o StrictHostKeyChecking=no ${env.REMOTE_USER}@${env.REMOTE_HOST} 'rm -rf /home/${env.REMOTE_USER}/${env.APP_DIR}'
-            scp -o StrictHostKeyChecking=no -r app/ ${env.REMOTE_USER}@${env.REMOTE_HOST}:/home/${env.REMOTE_USER}/${env.APP_DIR}
-            ssh -o StrictHostKeyChecking=no ${env.REMOTE_USER}@${env.REMOTE_HOST} <<EOF
-              cd /home/${env.REMOTE_USER}/${env.APP_DIR}
-              docker stop my-node-app || true
-              docker rm my-node-app || true
-              docker build -t my-node-app .
-              docker run -d -p 3000:3000 --name my-node-app my-node-app
-            EOF
-          """
-        }
+        git branch: 'main', url: 'https://github.com/nenavathsrinu/Real-Time-DevOps-Hands-On-Project-Plan.git'
       }
     }
 
-    stage('Destroy Docker Container') {
-      when {
-        expression { params.ACTION == 'destroy' }
-      }
+    stage('Terraform Action') {
       steps {
-        script {
-          echo "🧹 Stopping and removing Docker container from ${env.REMOTE_HOST}..."
-
-          sh """
-            ssh -o StrictHostKeyChecking=no ${env.REMOTE_USER}@${env.REMOTE_HOST} <<EOF
-              docker stop my-node-app || true
-              docker rm my-node-app || true
-            EOF
-          """
+        dir('terraform') {
+          withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-credentials'
+          ]]) {
+            script {
+              if (params.ACTION == 'create') {
+                sh '''
+                  terraform init
+                  terraform validate
+                  terraform plan -out=tfplan
+                  terraform apply -auto-approve tfplan
+                '''
+              } else if (params.ACTION == 'destroy') {
+                sh '''
+                  terraform init
+                  terraform validate
+                  terraform destroy -auto-approve
+                '''
+              } else {
+                error "Unsupported ACTION value: ${params.ACTION}"
+              }
+            }
+          }
         }
       }
+    }
+  }
+
+  post {
+    success {
+      echo "✅ Terraform '${params.ACTION}' completed successfully!"
+    }
+    failure {
+      echo "❌ Terraform '${params.ACTION}' failed."
     }
   }
 }
