@@ -18,7 +18,7 @@ module "iam" {
 module "jenkins_ec2" {
   source             = "./modules/ec2"
   ami_id             = "ami-00b7ea845217da02c"  # Amazon Linux 2 AMI (update as needed)
-  instance_type      = "t2.micro"
+  instance_type      = "t2.medium"
   subnet_id          = module.vpc.public_subnet_ids[0]
   key_name           = "linux-test"
   instance_name      = "jenkins-server"
